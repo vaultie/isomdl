@@ -1,12 +1,11 @@
 //! An implementation of `RFC-8152` `COSE_Key` restricted to the requirements of `ISO/IEC 18013-5:2021`.
 //!
-//! This module provides the [CoseKey] enum, which represents a `COSE_Key` object as defined in `RFC-8152`.  
+//! This module provides the [CoseKey] enum, which represents a `COSE_Key` object as defined in `RFC-8152`.
 //! It supports two key types: `EC2 (Elliptic Curve)` and `OKP (Octet Key Pair).
 //!
 //! # Examples
 //!
 //! ```ignore
-//! use ssi_jwk::JWK;
 //! use std::convert::TryInto;
 //! use crate::CoseKey;
 //!
@@ -24,11 +23,10 @@
 //! ```
 use std::collections::BTreeMap;
 
-use aes::cipher::generic_array::{typenum::U8, GenericArray};
 use coset::iana::Algorithm;
+use generic_array::{typenum::U8, GenericArray};
 use p256::EncodedPoint;
 use serde::{Deserialize, Serialize};
-use ssi_jwk::JWK;
 
 /// An implementation of RFC-8152 [COSE_Key](https://datatracker.ietf.org/doc/html/rfc8152#section-13)
 /// restricted to the requirements of ISO/IEC 18013-5:2021.
@@ -319,126 +317,6 @@ impl TryFrom<i128> for OKPCurve {
             5 => Ok(OKPCurve::X448),
             6 => Ok(OKPCurve::Ed25519),
             7 => Ok(OKPCurve::Ed448),
-            _ => Err(Error::UnsupportedCurve),
-        }
-    }
-}
-
-impl TryFrom<JWK> for CoseKey {
-    type Error = Error;
-
-    fn try_from(jwk: JWK) -> Result<Self, Self::Error> {
-        match jwk.params {
-            ssi_jwk::Params::EC(params) => {
-                let x = params
-                    .x_coordinate
-                    .as_ref()
-                    .ok_or(Error::EC2MissingX)?
-                    .0
-                    .clone();
-                Ok(CoseKey::EC2 {
-                    crv: (&params).try_into()?,
-                    x,
-                    y: params.try_into()?,
-                })
-            }
-            ssi_jwk::Params::OKP(params) => Ok(CoseKey::OKP {
-                crv: (&params).try_into()?,
-                x: params.public_key.0.clone(),
-            }),
-            _ => Err(Error::UnsupportedKeyType),
-        }
-    }
-}
-
-impl TryFrom<&ssi_jwk::ECParams> for EC2Curve {
-    type Error = Error;
-
-    fn try_from(params: &ssi_jwk::ECParams) -> Result<Self, Self::Error> {
-        match params.curve.as_ref() {
-            Some(crv) if crv == "P-256" => Ok(Self::P256),
-            Some(crv) if crv == "P-384" => Ok(Self::P384),
-            Some(crv) if crv == "P-521" => Ok(Self::P521),
-            Some(crv) if crv == "secp256k1" => Ok(Self::P256K),
-            Some(_) => Err(Error::UnsupportedCurve),
-            None => Err(Error::UnknownCurve),
-        }
-    }
-}
-
-impl TryFrom<ssi_jwk::ECParams> for EC2Y {
-    type Error = Error;
-
-    fn try_from(params: ssi_jwk::ECParams) -> Result<Self, Self::Error> {
-        if let Some(y) = params.y_coordinate.as_ref() {
-            Ok(Self::Value(y.0.clone()))
-        } else {
-            Err(Error::EC2MissingY)
-        }
-    }
-}
-
-impl TryFrom<CoseKey> for JWK {
-    type Error = Error;
-    fn try_from(cose: CoseKey) -> Result<JWK, Error> {
-        Ok(match cose {
-            CoseKey::EC2 { crv, x, y } => JWK {
-                params: ssi_jwk::Params::EC(ssi_jwk::ECParams {
-                    curve: Some(match crv {
-                        EC2Curve::P256 => "P-256".to_string(),
-                        EC2Curve::P384 => "P-384".to_string(),
-                        EC2Curve::P521 => "P-521".to_string(),
-                        EC2Curve::P256K => "secp256k1".to_string(),
-                    }),
-                    x_coordinate: Some(ssi_jwk::Base64urlUInt(x)),
-                    y_coordinate: match y {
-                        EC2Y::Value(vec) => Some(ssi_jwk::Base64urlUInt(vec)),
-                        EC2Y::SignBit(_) => return Err(Error::UnsupportedFormat),
-                    },
-                    ecc_private_key: None,
-                }),
-                public_key_use: None,
-                key_operations: None,
-                algorithm: None,
-                key_id: None,
-                x509_url: None,
-                x509_certificate_chain: None,
-                x509_thumbprint_sha1: None,
-                x509_thumbprint_sha256: None,
-            },
-            CoseKey::OKP { crv, x } => JWK {
-                params: ssi_jwk::Params::OKP(ssi_jwk::OctetParams {
-                    curve: match crv {
-                        OKPCurve::X25519 => "X25519".to_string(),
-                        OKPCurve::X448 => "X448".to_string(),
-                        OKPCurve::Ed25519 => "Ed25519".to_string(),
-                        OKPCurve::Ed448 => "Ed448".to_string(),
-                    },
-                    public_key: ssi_jwk::Base64urlUInt(x),
-                    private_key: None,
-                }),
-                public_key_use: None,
-                key_operations: None,
-                algorithm: None,
-                key_id: None,
-                x509_url: None,
-                x509_certificate_chain: None,
-                x509_thumbprint_sha1: None,
-                x509_thumbprint_sha256: None,
-            },
-        })
-    }
-}
-
-impl TryFrom<&ssi_jwk::OctetParams> for OKPCurve {
-    type Error = Error;
-
-    fn try_from(params: &ssi_jwk::OctetParams) -> Result<Self, Self::Error> {
-        match params.curve.as_str() {
-            "Ed25519" => Ok(Self::Ed25519),
-            "Ed448" => Ok(Self::Ed448),
-            "X25519" => Ok(Self::X25519),
-            "X448" => Ok(Self::X448),
             _ => Err(Error::UnsupportedCurve),
         }
     }

@@ -62,7 +62,7 @@ use anyhow::{anyhow, Result};
 use std::{fs::File, io::Read};
 use x509_cert::{
     certificate::Certificate,
-    der::{Decode, Encode},
+    der::{Decode, DecodePem, Encode},
 };
 
 pub const X5CHAIN_HEADER_LABEL: i128 = 33;
@@ -110,7 +110,7 @@ impl X5Chain {
 
 /// Builder for creating an [X5Chain].
 ///
-/// This struct is used to build an [X5Chain] by providing a vector of [X509] certificates.  
+/// This struct is used to build an [X5Chain] by providing a vector of [X509] certificates.
 /// The [X5Chain] represents a chain of `X.509`` certificates used for issuance.
 ///
 /// # Note
@@ -133,14 +133,11 @@ impl Builder {
     ///
     /// Returns a [Result] containing the updated [Builder] if successful.
     pub fn with_pem(mut self, data: &[u8]) -> Result<Builder> {
-        let bytes = pem_rfc7468::decode_vec(data)
-            .map_err(|e| anyhow!("unable to parse pem: {}", e))?
-            .1;
-        let cert: Certificate = Certificate::from_der(&bytes)
+        let cert: Certificate = Certificate::from_pem(data)
             .map_err(|e| anyhow!("unable to parse certificate from der: {}", e))?;
         let x509 = X509 {
             bytes: cert
-                .to_vec()
+                .to_der()
                 .map_err(|e| anyhow!("unable to convert certificate to bytes: {}", e))?,
         };
         self.certs.push(x509);
@@ -162,7 +159,7 @@ impl Builder {
             .map_err(|e| anyhow!("unable to parse certificate from der encoding: {}", e))?;
         let x509 = X509 {
             bytes: cert
-                .to_vec()
+                .to_der()
                 .map_err(|e| anyhow!("unable to convert certificate to bytes: {}", e))?,
         };
         self.certs.push(x509);

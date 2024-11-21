@@ -47,7 +47,6 @@ use std::collections::BTreeMap;
 
 pub mod cose_key;
 pub use cose_key::CoseKey;
-pub use cose_key::EC2Curve;
 
 /// Represents information about a device key.
 #[derive(Clone, Debug, Serialize, Deserialize)]
