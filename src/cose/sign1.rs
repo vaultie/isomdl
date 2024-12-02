@@ -225,6 +225,7 @@ impl MaybeTagged<CoseSign1> {
     }
 }
 
+#[cfg(feature = "crypto")]
 mod p256 {
     use coset::iana;
     use p256::ecdsa::{SigningKey, VerifyingKey};
@@ -246,6 +247,7 @@ mod p256 {
     }
 }
 
+#[cfg(feature = "crypto")]
 mod p384 {
     use coset::iana;
     use p384::ecdsa::{SigningKey, VerifyingKey};
@@ -267,7 +269,7 @@ mod p384 {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "crypto"))]
 mod tests {
     use crate::cbor;
     use crate::cose::sign1::{CoseSign1, Error, PreparedCoseSign1};

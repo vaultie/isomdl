@@ -1,12 +1,10 @@
-use ::hmac::Hmac;
 use coset::cwt::ClaimsSet;
 use coset::{
     mac_structure_data, CborSerializable, CoseError, CoseMac0, MacContext,
     RegisteredLabelWithPrivate,
 };
-use digest::{Mac, MacError};
+use digest::{Mac, MacError, Reset};
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
 
 use crate::cose::{MaybeTagged, SignatureAlgorithm};
 
@@ -157,9 +155,9 @@ impl PreparedCoseMac0 {
 
 impl MaybeTagged<CoseMac0> {
     /// Verify that the tag of a `COSE_Mac0` is authentic.
-    pub fn verify(
+    pub fn verify<V: Mac + Reset + SignatureAlgorithm + Clone>(
         &self,
-        verifier: &Hmac<Sha256>,
+        verifier: &V,
         detached_payload: Option<&[u8]>,
         external_aad: Option<&[u8]>,
     ) -> VerificationResult {
@@ -191,7 +189,7 @@ impl MaybeTagged<CoseMac0> {
         );
 
         let mut mac = verifier.clone();
-        mac.reset();
+        Mac::reset(&mut mac);
         mac.update(&tag_payload);
         match mac.verify_slice(tag) {
             Ok(()) => VerificationResult::Success,
@@ -211,6 +209,7 @@ impl MaybeTagged<CoseMac0> {
     }
 }
 
+#[cfg(feature = "crypto")]
 mod hmac {
     use coset::iana;
     use hmac::Hmac;
@@ -227,7 +226,7 @@ mod hmac {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "crypto"))]
 mod tests {
     use crate::cbor;
     use crate::cose::mac0::{CoseMac0, PreparedCoseMac0};

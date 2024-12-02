@@ -24,8 +24,6 @@
 use std::collections::BTreeMap;
 
 use coset::iana::Algorithm;
-use generic_array::{typenum::U8, GenericArray};
-use p256::EncodedPoint;
 use serde::{Deserialize, Serialize};
 
 /// An implementation of RFC-8152 [COSE_Key](https://datatracker.ietf.org/doc/html/rfc8152#section-13)
@@ -205,9 +203,12 @@ impl TryFrom<ciborium::Value> for CoseKey {
     }
 }
 
-impl TryFrom<CoseKey> for EncodedPoint {
+#[cfg(feature = "crypto")]
+impl TryFrom<CoseKey> for p256::EncodedPoint {
     type Error = Error;
-    fn try_from(value: CoseKey) -> Result<EncodedPoint, Self::Error> {
+    fn try_from(value: CoseKey) -> Result<p256::EncodedPoint, Self::Error> {
+        use generic_array::{typenum::U8, GenericArray};
+
         match value {
             CoseKey::EC2 {
                 crv: EC2Curve::P256,
@@ -219,7 +220,7 @@ impl TryFrom<CoseKey> for EncodedPoint {
                     EC2Y::Value(y) => {
                         let y_generic_array = GenericArray::from_slice(y.as_ref());
 
-                        Ok(EncodedPoint::from_affine_coordinates(
+                        Ok(p256::EncodedPoint::from_affine_coordinates(
                             x_generic_array,
                             y_generic_array,
                             false,
@@ -233,8 +234,8 @@ impl TryFrom<CoseKey> for EncodedPoint {
                             bytes.insert(0, 2)
                         }
 
-                        let encoded =
-                            EncodedPoint::from_bytes(bytes).map_err(|_e| Error::InvalidCoseKey)?;
+                        let encoded = p256::EncodedPoint::from_bytes(bytes)
+                            .map_err(|_e| Error::InvalidCoseKey)?;
                         Ok(encoded)
                     }
                 }
@@ -242,7 +243,7 @@ impl TryFrom<CoseKey> for EncodedPoint {
             CoseKey::OKP { crv: _, x } => {
                 let x_generic_array: GenericArray<_, U8> =
                     GenericArray::clone_from_slice(&x[0..42]);
-                let encoded = EncodedPoint::from_bytes(x_generic_array)
+                let encoded = p256::EncodedPoint::from_bytes(x_generic_array)
                     .map_err(|_e| Error::InvalidCoseKey)?;
                 Ok(encoded)
             }

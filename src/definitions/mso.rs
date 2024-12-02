@@ -26,7 +26,7 @@
 //!
 //! # Notes
 //!
-//! - [DigestId] struct represents an unsigned integer between `0` and `(2^31 - 1)` inclusive.  
+//! - [DigestId] struct represents an unsigned integer between `0` and `(2^31 - 1)` inclusive.
 //!   It is enforced to be positive.
 //! - [DigestIds] type is a [BTreeMap] that maps [DigestId] to [ByteStr].
 //! - [DigestAlgorithm] enum represents different digest algorithms, such as `SHA-256, `SHA-384,
@@ -73,6 +73,35 @@ pub enum DigestAlgorithm {
     SHA384,
     #[serde(rename = "SHA-512")]
     SHA512,
+}
+
+impl DigestAlgorithm {
+    #[cfg(feature = "crypto")]
+    pub fn digest(&self, bytes: &[u8]) -> Vec<u8> {
+        use sha2::{Digest, Sha256, Sha384, Sha512};
+
+        match self {
+            DigestAlgorithm::SHA256 => Sha256::digest(bytes).to_vec(),
+            DigestAlgorithm::SHA384 => Sha384::digest(bytes).to_vec(),
+            DigestAlgorithm::SHA512 => Sha512::digest(bytes).to_vec(),
+        }
+    }
+
+    #[cfg(feature = "openssl")]
+    pub fn digest(&self, bytes: &[u8]) -> Vec<u8> {
+        use openssl::sha;
+
+        match self {
+            DigestAlgorithm::SHA256 => sha::sha256(bytes).to_vec(),
+            DigestAlgorithm::SHA384 => sha::sha384(bytes).to_vec(),
+            DigestAlgorithm::SHA512 => sha::sha512(bytes).to_vec(),
+        }
+    }
+
+    #[cfg(not(any(feature = "crypto", feature = "openssl")))]
+    pub fn digest(&self, bytes: &[u8]) -> Vec<u8> {
+        compile_error!("Either `crypto` or `openssl` features have to be activated for this crate to function.")
+    }
 }
 
 impl DigestId {
