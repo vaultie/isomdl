@@ -737,12 +737,8 @@ impl PreparedDocument {
             ..
         } = self;
         let device_auth = match prepared_cose {
-            PreparedCose::Sign1(inner) => DeviceAuth::Signature {
-                device_signature: inner.finalize(signature),
-            },
-            PreparedCose::Mac0(inner) => DeviceAuth::Mac {
-                device_mac: inner.finalize(signature),
-            },
+            PreparedCose::Sign1(inner) => DeviceAuth::DeviceSignature(inner.finalize(signature)),
+            PreparedCose::Mac0(inner) => DeviceAuth::DeviceMac(inner.finalize(signature)),
         };
         let device_signed = DeviceSigned {
             namespaces: device_namespaces,
@@ -900,7 +896,7 @@ pub trait DeviceSession {
                         cose_sign1_builder,
                         Some(&device_auth_bytes),
                         None,
-                        true,
+                        false,
                     ) {
                         Ok(prepared) => prepared,
                         Err(_e) => {
@@ -920,7 +916,7 @@ pub trait DeviceSession {
                         cose_mac0_builder,
                         Some(&device_auth_bytes),
                         None,
-                        true,
+                        false,
                     ) {
                         Ok(prepared) => prepared,
                         Err(_e) => {
